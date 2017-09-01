@@ -143,6 +143,8 @@ func generateConcourseManifest(config *config.Config, metadata *terraform.Metada
 		TLSKey:                  config.ConcourseKey,
 		URL:                     fmt.Sprintf("https://%s", config.Domain),
 		Username:                config.ConcourseUsername,
+		VaultTLSCert:            config.ConcourseCert,
+		VaultTLSKey:             config.ConcourseKey,
 		WorkerCount:             config.ConcourseWorkerCount,
 		WorkerSize:              config.ConcourseWorkerSize,
 	}
@@ -190,6 +192,8 @@ type awsConcourseManifestParams struct {
 	TLSKey                  string
 	URL                     string
 	Username                string
+	VaultTLSCert            string
+	VaultTLSKey             string
 	WorkerCount             int
 	WorkerSize              string
 }
@@ -203,6 +207,11 @@ const awsConcourseManifestTemplate = `---
 name: concourse
 
 releases:
+- name: vault
+  version: 0.6.1
+  url: https://bosh.io/d/github.com/cloudfoundry-community/vault-boshrelease?v=0.6.1
+  sha1: 9f1bc371b5c1b7faadca97b892d6cc6d3c6baea6
+
 - name: concourse
   url: "<% .ConcourseReleaseURL %>"
   sha1: "<% .ConcourseReleaseSHA1 %>"
@@ -281,6 +290,19 @@ instance_groups:
         ssl_mode: verify-full
         ca_cert: |-
           <% .Indent "10" .DBCACert %>
+  - name: vault
+    release: vault
+    properties:
+      vault:
+        storage:
+          use_file: true
+        listener:
+          tcp:
+            tls:
+              certificate: |-
+                <% .Indent "16" .TLSCert %>
+              key: |-
+                <% .Indent "16" .TLSKey %>
 
   - name: tsa
     release: concourse

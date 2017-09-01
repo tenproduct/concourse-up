@@ -448,6 +448,13 @@ resource "aws_security_group" "atc" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  ingress {
+    from_port   = 8200
+    to_port     = 8200
+    protocol    = "tcp"
+    cidr_blocks = ["${var.source_access_ip}/32", "${aws_nat_gateway.default.public_ip}/32"]
+  }
 }
 
 resource "aws_route_table" "rds" {
