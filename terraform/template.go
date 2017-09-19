@@ -587,7 +587,8 @@ output "blobstore_user_access_key_id" {
 }
 
 output "blobstore_user_secret_access_key" {
-  value = "${aws_iam_access_key.blobstore.secret}"
+  value     = "${aws_iam_access_key.blobstore.secret}"
+  sensitive = true
 }
 
 output "bosh_user_access_key_id" {
@@ -595,7 +596,8 @@ output "bosh_user_access_key_id" {
 }
 
 output "bosh_user_secret_access_key" {
-  value = "${aws_iam_access_key.bosh.secret}"
+  value     = "${aws_iam_access_key.bosh.secret}"
+  sensitive = true
 }
 
 output "bosh_db_port" {
