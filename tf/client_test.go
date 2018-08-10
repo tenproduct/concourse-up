@@ -28,11 +28,11 @@ func TestExecCommandHelper(t *testing.T) {
 	os.Exit(i)
 }
 
-func TestClient_Apply_calls_terraform(t *testing.T) {
+func TestClient_Apply_parses_output(t *testing.T) {
 	e := fakeexec.New(t)
 	defer e.Finish()
 
-	e.Expect("terraform", "apply")
+	e.Expect("terraform", "apply", "-input=false", "-auto-approve")
 	e.Expect("terraform", "output", "--json").Outputs(`{
 		"foo": {
 			"sensitive": false,
@@ -59,7 +59,7 @@ func TestClient_Apply_calls_terraform(t *testing.T) {
 
 	c, err := tf.New(tf.FakeExec(e.Cmd()))
 	require.NoError(t, err)
-	out, err := c.Apply()
+	out, err := c.Apply(nil)
 	require.NoError(t, err)
 
 	require.Equal(t, tf.OutputTypeString, out["foo"].Type())
@@ -79,6 +79,29 @@ func TestClient_Apply_calls_terraform(t *testing.T) {
 		"ham":  "ham",
 		"eggs": "eggs",
 	}, m)
+}
+func TestClient_Apply_with_vars(t *testing.T) {
+	e := fakeexec.New(t)
+	defer e.Finish()
+
+	e.Expect("terraform", "apply", "-input=false", "-auto-approve", "-var=foo=bar")
+	e.Expect("terraform", "output", "--json").Outputs(`{}`)
+
+	c, err := tf.New(tf.FakeExec(e.Cmd()))
+	require.NoError(t, err)
+	_, err = c.Apply(map[string]string{"foo": "bar"})
+	require.NoError(t, err)
+}
+func TestClient_Destroy(t *testing.T) {
+	e := fakeexec.New(t)
+	defer e.Finish()
+
+	e.Expect("terraform", "destroy", "-auto-approve")
+
+	c, err := tf.New(tf.FakeExec(e.Cmd()))
+	require.NoError(t, err)
+	err = c.Destroy()
+	require.NoError(t, err)
 }
 
 func TestClient_FromURL(t *testing.T) {

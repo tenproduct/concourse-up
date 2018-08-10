@@ -2,6 +2,7 @@ package tf
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -77,8 +78,16 @@ func (c *Client) Close() error {
 }
 
 // Apply does a "terraform apply" and returns the outputs.
-func (c *Client) Apply() (map[string]Output, error) {
-	cmd := c.exec(c.terraformPath, "apply")
+func (c *Client) Apply(vars map[string]string) (map[string]Output, error) {
+	applyArgs := []string{
+		"apply",
+		"-input=false",
+		"-auto-approve",
+	}
+	for k, v := range vars {
+		applyArgs = append(applyArgs, fmt.Sprintf("-var=%s=%s", k, v))
+	}
+	cmd := c.exec(c.terraformPath, applyArgs...)
 	cmd.Dir = c.confPath
 	if err := cmd.Run(); err != nil {
 		return nil, err
@@ -89,6 +98,7 @@ func (c *Client) Apply() (map[string]Output, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Close()
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
@@ -97,6 +107,12 @@ func (c *Client) Apply() (map[string]Output, error) {
 		return nil, err
 	}
 	return out, cmd.Wait()
+}
+
+func (c *Client) Destroy() error {
+	cmd := c.exec(c.terraformPath, "destroy", "-auto-approve")
+	cmd.Dir = c.confPath
+	return cmd.Run()
 }
 
 // Output represents a terraform output

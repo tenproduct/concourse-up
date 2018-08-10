@@ -107,9 +107,7 @@ func (client *Client) updateBoshAndPipeline(config *config.Config, metadata *ter
 	// If concourse is already running this is an update rather than a fresh deploy
 	// When updating we need to deploy the BOSH as the final step in order to
 	// Detach from the update, so the update job can exit
-	config.ConcourseUsername = "admin"
-	var err error
-	config.ConcoursePassword, err = client.getMeMyPassword()
+	concoursePassword, err := client.getMeMyPassword()
 	if err != nil {
 		return err
 	}
@@ -117,7 +115,7 @@ func (client *Client) updateBoshAndPipeline(config *config.Config, metadata *ter
 		Target:   config.Deployment,
 		API:      fmt.Sprintf("https://%s", config.Domain),
 		Username: config.ConcourseUsername,
-		Password: config.ConcoursePassword,
+		Password: concoursePassword,
 	},
 		client.stdout,
 		client.stderr,
