@@ -1,15 +1,13 @@
 #!/bin/bash
 
-set -e
-[ "$VERBOSE" ] && { set -x; export BOSH_LOG_LEVEL=debug; export BOSH_LOG_PATH=bosh.log; }
-if [ -z "$SYSTEM_TEST_ID" ]; then
-    SYSTEM_TEST_ID=$RANDOM
-fi
-deployment="systest-cleanup-$SYSTEM_TEST_ID"
-set -u
+[ "$VERBOSE" ] && { set -x; export BOSH_LOG_LEVEL=debug; }
+set -euo pipefail
 
-cp "$BINARY_PATH" ./cup
-chmod +x ./cup
+deployment="systest-cleanup-$RANDOM"
+
+dirname=$(dirname "$0")
+# shellcheck disable=SC1090
+source "${dirname}/test_helper.sh"
 
 ./cup deploy $deployment
 

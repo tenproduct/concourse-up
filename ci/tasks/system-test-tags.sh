@@ -1,25 +1,13 @@
 #!/bin/bash
 
 [ "$VERBOSE" ] && { set -x; export BOSH_LOG_LEVEL=debug; }
-set -eu
+set -euo pipefail
 
 deployment="systest-tags-$RANDOM"
 
-cleanup() {
-  status=$?
-  ./cup --non-interactive destroy $deployment
-  exit $status
-}
-set +u
-if [ -z "$SKIP_TEARDOWN" ]; then
-  trap cleanup EXIT
-else
-  trap "echo Skipping teardown" EXIT
-fi
-set -u
-
-cp "$BINARY_PATH" ./cup
-chmod +x ./cup
+dirname=$(dirname "$0")
+# shellcheck disable=SC1090
+source "${dirname}/test_helper.sh"
 
 echo "DEPLOY WITH TAGS"
 

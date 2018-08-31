@@ -4,25 +4,16 @@
 # Instead we will test that if we publish a non-existant release, the self-update will revert back to a known release
 
 [ "$VERBOSE" ] && { set -x; export BOSH_LOG_LEVEL=debug; }
-set -eu
+set -euo pipefail
 
 deployment="systest-update-$RANDOM"
 
-cleanup() {
-  status=$?
-  ./cup-new --non-interactive destroy $deployment
-  exit $status
-}
-set +u
-if [ -z "$SKIP_TEARDOWN" ]; then
-  trap cleanup EXIT
-else
-  trap "echo Skipping teardown" EXIT
-fi
-set -u
+dirname=$(dirname "$0")
+# shellcheck disable=SC1090
+source "${dirname}/test_helper.sh"
 
 cp release/concourse-up-linux-amd64 ./cup-old
-cp "$BINARY_PATH" ./cup-new
+mv ./cup ./cup-new
 chmod +x ./cup-*
 
 echo "DEPLOY OLD VERSION"
