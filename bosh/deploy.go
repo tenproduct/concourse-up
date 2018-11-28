@@ -26,11 +26,9 @@ func (client *Client) Deploy(state, creds []byte, detach bool) (newState, newCre
 	if err = client.updateCloudConfig(bosh); err != nil {
 		return state, creds, err
 	}
-
 	if err = client.uploadConcourseStemcell(bosh); err != nil {
 		return state, creds, err
 	}
-
 	if err = client.createDefaultDatabases(); err != nil {
 		return state, creds, err
 	}
@@ -80,7 +78,7 @@ func (client *Client) createEnv(bosh *boshenv.BOSHCLI, state, creds []byte) (new
 	}
 
 	switch client.provider.IAAS() {
-	case "AWS":
+	case "AWS": // nolint
 		boshUserAccessKeyID, err1 := client.metadata.Get("BoshUserAccessKeyID")
 		if err1 != nil {
 			return state, creds, err1
@@ -166,11 +164,11 @@ func (client *Client) createEnv(bosh *boshenv.BOSHCLI, state, creds []byte) (new
 			S3AWSAccessKeyID:     blobstoreUserAccessKeyID,
 			S3AWSSecretAccessKey: blobstoreSecretAccessKey,
 			Spot:                 client.config.Spot,
-		}, client.config.DirectorPassword, client.config.DirectorCert, client.config.DirectorKey, client.config.DirectorCACert, tags)
+			WorkerType:           client.config.WorkerType}, client.config.DirectorPassword, client.config.DirectorCert, client.config.DirectorKey, client.config.DirectorCACert, tags)
 		if err1 != nil {
 			return store["state.json"], store["vars.yaml"], err1
 		}
-	case "GCP":
+	case "GCP": // nolint
 
 		network, err1 := client.metadata.Get("Network")
 		if err1 != nil {
@@ -203,7 +201,7 @@ func (client *Client) createEnv(bosh *boshenv.BOSHCLI, state, creds []byte) (new
 			InternalGW:         "10.0.0.1",
 			InternalIP:         "10.0.0.6",
 			DirectorName:       "bosh",
-			Zone:               client.provider.Zone(),
+			Zone:               client.provider.Zone(""),
 			Network:            network,
 			PublicSubnetwork:   publicSubnetwork,
 			PrivateSubnetwork:  privateSubnetwork,
@@ -221,44 +219,78 @@ func (client *Client) createEnv(bosh *boshenv.BOSHCLI, state, creds []byte) (new
 }
 
 func (client *Client) updateCloudConfig(bosh *boshenv.BOSHCLI) error {
-	publicSubnetID, err := client.metadata.Get("PublicSubnetID")
-	if err != nil {
-		return err
+	switch client.provider.IAAS() {
+	case "AWS": // nolint
+		publicSubnetID, err := client.metadata.Get("PublicSubnetID")
+		if err != nil {
+			return err
+		}
+		privateSubnetID, err := client.metadata.Get("PrivateSubnetID")
+		if err != nil {
+			return err
+		}
+		aTCSecurityGroupID, err := client.metadata.Get("ATCSecurityGroupID")
+		if err != nil {
+			return err
+		}
+		vMsSecurityGroupID, err := client.metadata.Get("VMsSecurityGroupID")
+		if err != nil {
+			return err
+		}
+		directorPublicIP, err := client.metadata.Get("DirectorPublicIP")
+		if err != nil {
+			return err
+		}
+		return bosh.UpdateCloudConfig(aws.Environment{
+			AZ:               client.config.AvailabilityZone,
+			PublicSubnetID:   publicSubnetID,
+			PrivateSubnetID:  privateSubnetID,
+			ATCSecurityGroup: aTCSecurityGroupID,
+			VMSecurityGroup:  vMsSecurityGroupID,
+			Spot:             client.config.Spot,
+			ExternalIP:       directorPublicIP,
+			WorkerType:       client.config.WorkerType,
+		}, directorPublicIP, client.config.DirectorPassword, client.config.DirectorCACert)
+	case "GCP": // nolint
+		privateSubnetwork, err := client.metadata.Get("PrivateSubnetworkName")
+		if err != nil {
+			return err
+		}
+		publicSubnetwork, err := client.metadata.Get("PublicSubnetworkName")
+		if err != nil {
+			return err
+		}
+		directorPublicIP, err := client.metadata.Get("DirectorPublicIP")
+		if err != nil {
+			return err
+		}
+		zone := client.provider.Zone("")
+		return bosh.UpdateCloudConfig(gcp.Environment{
+			Preemptible:       true,
+			PublicSubnetwork:  publicSubnetwork,
+			PrivateSubnetwork: privateSubnetwork,
+			Zone:              zone,
+		}, directorPublicIP, client.config.DirectorPassword, client.config.DirectorCACert)
 	}
-	privateSubnetID, err := client.metadata.Get("PrivateSubnetID")
-	if err != nil {
-		return err
-	}
-	aTCSecurityGroupID, err := client.metadata.Get("ATCSecurityGroupID")
-	if err != nil {
-		return err
-	}
-	vMsSecurityGroupID, err := client.metadata.Get("VMsSecurityGroupID")
-	if err != nil {
-		return err
-	}
-	directorPublicIP, err := client.metadata.Get("DirectorPublicIP")
-	if err != nil {
-		return err
-	}
-	return bosh.UpdateCloudConfig(aws.Environment{
-		AZ:               client.config.AvailabilityZone,
-		PublicSubnetID:   publicSubnetID,
-		PrivateSubnetID:  privateSubnetID,
-		ATCSecurityGroup: aTCSecurityGroupID,
-		VMSecurityGroup:  vMsSecurityGroupID,
-		Spot:             client.config.Spot,
-		ExternalIP:       directorPublicIP,
-	}, directorPublicIP, client.config.DirectorPassword, client.config.DirectorCACert)
+	return nil
 }
 func (client *Client) uploadConcourseStemcell(bosh *boshenv.BOSHCLI) error {
 	directorPublicIP, err := client.metadata.Get("DirectorPublicIP")
 	if err != nil {
 		return err
 	}
-	return bosh.UploadConcourseStemcell(aws.Environment{
-		ExternalIP: directorPublicIP,
-	}, directorPublicIP, client.config.DirectorPassword, client.config.DirectorCACert)
+	switch client.provider.IAAS() {
+	case "AWS": // nolint
+		return bosh.UploadConcourseStemcell(aws.Environment{
+			ExternalIP: directorPublicIP,
+		}, directorPublicIP, client.config.DirectorPassword, client.config.DirectorCACert)
+	case "GCP": // nolint
+		return bosh.UploadConcourseStemcell(gcp.Environment{
+			ExternalIP: directorPublicIP,
+		}, directorPublicIP, client.config.DirectorPassword, client.config.DirectorCACert)
+	}
+
+	return nil
 }
 
 func (client *Client) saveStateFile(bytes []byte) (string, error) {

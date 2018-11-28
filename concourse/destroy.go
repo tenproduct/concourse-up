@@ -23,7 +23,10 @@ func (client *Client) Destroy() error {
 	var volumesToDelete []string
 
 	switch client.provider.IAAS() {
+
 	case "AWS": // nolint
+		conf.RDSDefaultDatabaseName = fmt.Sprintf("bosh_%s", eightRandomLetters())
+
 		err = environment.Build(map[string]interface{}{
 			"AllowIPs":               conf.AllowIPs,
 			"AvailabilityZone":       conf.AvailabilityZone,
@@ -60,6 +63,8 @@ func (client *Client) Destroy() error {
 		}
 
 	case "GCP": // nolint
+		conf.RDSDefaultDatabaseName = fmt.Sprintf("bosh-%s", eightRandomLetters())
+
 		project, err1 := client.provider.Attr("project")
 		if err1 != nil {
 			return err1
@@ -68,9 +73,10 @@ func (client *Client) Destroy() error {
 		if err1 != nil {
 			return err1
 		}
+		zone := client.provider.Zone("")
 		err1 = environment.Build(map[string]interface{}{
 			"Region":             client.provider.Region(),
-			"Zone":               client.provider.Zone(),
+			"Zone":               zone,
 			"Tags":               "",
 			"Project":            project,
 			"GCPCredentialsJSON": credentialspath,
@@ -82,6 +88,10 @@ func (client *Client) Destroy() error {
 			"DBPassword":         conf.RDSPassword,
 			"DBUsername":         conf.RDSUsername,
 		})
+		if err1 != nil {
+			return nil
+		}
+		err1 = client.provider.DeleteVMsInDeployment(zone, project, conf.Deployment)
 		if err1 != nil {
 			return err1
 		}

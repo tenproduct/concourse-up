@@ -43,6 +43,7 @@ type Environment struct {
 	SecretAccessKey       string
 	Spot                  bool
 	VMSecurityGroup       string
+	WorkerType            string
 }
 
 var allOperations = resource.AWSCPIOps + resource.ExternalIPOps + resource.DirectorCustomOps
@@ -89,6 +90,12 @@ type awsCloudConfigParams struct {
 	PublicSubnetID     string
 	Spot               bool
 	VMsSecurityGroupID string
+	WorkerType         string
+}
+
+// IAASCheck returns the IAAS provider
+func (e Environment) IAASCheck() string {
+	return "AWS"
 }
 
 // ConfigureDirectorCloudConfig inserts values from the environment into the config template passed as argument
@@ -101,6 +108,7 @@ func (e Environment) ConfigureDirectorCloudConfig(cloudConfig string) (string, e
 		PublicSubnetID:     e.PublicSubnetID,
 		PrivateSubnetID:    e.PrivateSubnetID,
 		Spot:               e.Spot,
+		WorkerType:         e.WorkerType,
 	}
 
 	cc, err := util.RenderTemplate(cloudConfig, templateParams)

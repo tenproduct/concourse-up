@@ -5,11 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iterator"
 )
 
@@ -89,6 +93,14 @@ func (g *GCPProvider) DeleteVersionedBucket(name string) error {
 		return err
 	}
 	err = g.DeleteFile(name, "default.tfstate")
+	if err != nil {
+		return err
+	}
+	err = g.DeleteFile(name, "director-creds.yml")
+	if err != nil {
+		return err
+	}
+	err = g.DeleteFile(name, "director-state.json")
 	if err != nil {
 		return err
 	}
@@ -189,7 +201,10 @@ func (g *GCPProvider) Region() string {
 //TODO: Choose an appropriate zone based on what zones the region has
 
 // Zone returns the zone used by the Provider
-func (g *GCPProvider) Zone() string {
+func (g *GCPProvider) Zone(input string) string {
+	if input != "" {
+		return input
+	}
 	return fmt.Sprintf("%s-b", g.region)
 }
 
@@ -230,10 +245,49 @@ func (g *GCPProvider) CheckForWhitelistedIP(ip, securityGroup string) (bool, err
 	return false, errors.New("CheckForWhitelistedIP Not Implemented Yet")
 }
 
-// DeleteVMsInVPC deletes all the VMs in the given VPC
+// DeleteVMsInVPC is a placeholder function used with AWS deployments
 func (g *GCPProvider) DeleteVMsInVPC(vpcID string) ([]string, error) {
-	// @note: This will be covered in a later iteration as we need a deployment to try it
-	return []string{}, errors.New("DeleteVMsInVPC Not Implemented Yet")
+	return []string{}, nil
+}
+
+//DeleteVMsInDeployment will delete all vms in a deployment apart from nat instance
+func (g *GCPProvider) DeleteVMsInDeployment(zone, project, deployment string) error {
+	ctx := context.Background()
+
+	c, err := google.DefaultClient(ctx, compute.CloudPlatformScope)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	computeService, err := compute.New(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// gets all compute instances for the project
+	req := computeService.Instances.List(project, zone)
+	if err := req.Pages(ctx, func(page *compute.InstanceList) error {
+		for _, instance := range page.Items {
+			name := instance.Name
+			networkName := instance.NetworkInterfaces[0].Network
+			// delete all instances in deployment's network apart from nat instance
+			if !strings.HasSuffix(name, "nat-instance") && strings.HasSuffix(networkName, fmt.Sprintf("%s-bosh-network", deployment)) {
+				fmt.Printf("Deleting instance %+v\n", name)
+				_, err := computeService.Instances.Delete(project, zone, name).Context(ctx).Do()
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	//TODO: shorter sleep times in a loop that checks whether any instances remain that need deleting
+	fmt.Println("Sleeping for 3 minutes to allow GCP update after instance deletion...")
+	time.Sleep(time.Second * 180)
+	return nil
 }
 
 // FindLongestMatchingHostedZone finds the longest hosted zone that matches the given subdomain
@@ -265,3 +319,6 @@ func getCredentials() (string, string, error) {
 	}
 	return projectID.(string), path, nil
 }
+
+// WorkerType is a nil setter for workerType
+func (g *GCPProvider) WorkerType(w string) {}

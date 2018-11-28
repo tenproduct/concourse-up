@@ -2,7 +2,10 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/EngineerBetter/concourse-up/terraform"
 
@@ -58,6 +61,13 @@ var deployFlags = []cli.Flag{
 		EnvVar:      "WORKER_SIZE",
 		Value:       "xlarge",
 		Destination: &deployArgs.WorkerSize,
+	},
+	cli.StringFlag{
+		Name:        "worker-type",
+		Usage:       "(optional) Specify a worker type for aws (m5 or m4)",
+		EnvVar:      "WORKER_TYPE",
+		Value:       "m4",
+		Destination: &deployArgs.WorkerType,
 	},
 	cli.StringFlag{
 		Name:        "web-size",
@@ -124,6 +134,28 @@ var deployFlags = []cli.Flag{
 		EnvVar:      "NAMESPACE",
 		Destination: &deployArgs.Namespace,
 	},
+	cli.StringFlag{
+		Name:        "zone",
+		Usage:       "(optional) Specify an availability zone",
+		EnvVar:      "ZONE",
+		Destination: &deployArgs.Zone,
+	},
+}
+
+func regionFromZone(zone string) (string, string) {
+	re := regexp.MustCompile(`(?m)^\w+-\w+-\d`)
+	regionFound := re.FindString(zone)
+	if regionFound != "" {
+		return regionFound, fmt.Sprintf("No region provided, please note that your zone will be paired with a matching region.\nThis region: %s is used for deployment.\n", regionFound)
+	}
+	return "", ""
+}
+
+func zoneBelongsToRegion(zone, region string) error {
+	if !strings.Contains(zone, region) {
+		return fmt.Errorf("The region and the zones provided do not match. Please note that the zone %s needs to be within a %s region", zone, region)
+	}
+	return nil
 }
 
 var deploy = cli.Command{
@@ -146,6 +178,20 @@ var deploy = cli.Command{
 		deployArgs.GithubAuthIsSet = c.IsSet("github-auth-client-id") && c.IsSet("github-auth-client-secret")
 		if err = deployArgs.Validate(); err != nil {
 			return err
+		}
+
+		if deployArgs.ZoneIsSet && deployArgs.AWSRegionIsSet {
+			if err1 := zoneBelongsToRegion(deployArgs.Zone, deployArgs.AWSRegion); err1 != nil {
+				return err1
+			}
+		}
+
+		if deployArgs.ZoneIsSet && !deployArgs.AWSRegionIsSet {
+			region, message := regionFromZone(deployArgs.Zone)
+			if region != "" {
+				deployArgs.AWSRegion = region
+				fmt.Print(message)
+			}
 		}
 
 		awsClient, err := iaas.New(deployArgs.IAAS, deployArgs.AWSRegion)

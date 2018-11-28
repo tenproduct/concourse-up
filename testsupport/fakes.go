@@ -97,12 +97,23 @@ type FakeAWSClient struct {
 	FakeWriteFile                     func(bucket, path string, contents []byte) error
 	FakeRegion                        func() string
 	FakeAttr                          func(string) (string, error)
-	FakeZone                          func() string
+	FakeZone                          func(string) string
+	FakeDeleteVMsInDeployment         func(zone, project, deployment string) error
+	FakeWorkerType                    func(string)
+}
+
+// WorkerType is here to implement iaas.IClient
+func (client *FakeAWSClient) WorkerType(w string) {
 }
 
 // IAAS is here to implement iaas.IClient
 func (client *FakeAWSClient) IAAS() string {
 	return "AWS"
+}
+
+// DeleteVMsInDeployment delegates to FakeDeleteVMsInDeployment which is dynamically set by the tests
+func (client *FakeAWSClient) DeleteVMsInDeployment(zone, project, deployment string) error {
+	return client.FakeDeleteVMsInDeployment(zone, project, deployment)
 }
 
 // Attr is here to implement iaas.IClient
@@ -111,8 +122,8 @@ func (client *FakeAWSClient) Attr(a string) (string, error) {
 }
 
 // Zone is here to implement iaas.IClient
-func (client *FakeAWSClient) Zone() string {
-	return client.FakeZone()
+func (client *FakeAWSClient) Zone(z string) string {
+	return client.FakeZone(z)
 }
 
 // Region delegates to FakeRegion which is dynamically set by the tests

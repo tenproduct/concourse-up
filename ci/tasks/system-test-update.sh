@@ -33,8 +33,8 @@ echo "DEPLOY OLD VERSION"
 # Otherwise terraform state can get into an invalid state
 # Also wait to make sure the BOSH lock is not taken before
 # starting deploy
-echo "Waiting for 30 seconds to give old deploy time to settle"
-sleep 30
+echo "Waiting for 10 minutes to give old deploy time to settle"
+sleep 600
 
 eval "$(./cup-old info --env $deployment)"
 config=$(./cup-old info --json $deployment)
@@ -48,12 +48,13 @@ until [[ $(bosh locks --json | jq -r '.Tables[].Rows | length') -eq 0 ]]; do
     echo "Waited too long for lock" && exit 1
   fi
   printf '.'
-  sleep 30
+  sleep 60
 done
 echo "Bosh lock available - Proceeding"
 
 echo "UPDATE TO NEW VERSION"
 # export SELF_UPDATE=true
+
 ./cup-new deploy $deployment
 
 echo "Waiting for 30 seconds to let detached upgrade start"

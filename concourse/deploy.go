@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"text/template"
 	"time"
 
@@ -55,6 +56,9 @@ func (client *Client) Deploy() error {
 		if err = writeConfigLoadedSuccessMessage(client.stdout); err != nil {
 			return err
 		}
+	} else {
+		client.provider.WorkerType(c.ConcourseWorkerSize)
+		c.AvailabilityZone = client.provider.Zone(client.deployArgs.Zone)
 	}
 
 	r, err := client.checkPreTerraformConfigRequirements(c, client.deployArgs.SelfUpdate)
@@ -73,6 +77,8 @@ func (client *Client) Deploy() error {
 	}
 	switch client.provider.IAAS() {
 	case "AWS": // nolint
+		c.RDSDefaultDatabaseName = fmt.Sprintf("bosh_%s", eightRandomLetters())
+
 		err = environment.Build(map[string]interface{}{
 			"AllowIPs":               c.AllowIPs,
 			"AvailabilityZone":       c.AvailabilityZone,
@@ -96,6 +102,7 @@ func (client *Client) Deploy() error {
 			return err
 		}
 	case "GCP": // nolint
+		c.RDSDefaultDatabaseName = fmt.Sprintf("bosh-%s", eightRandomLetters())
 		project, err1 := client.provider.Attr("project")
 		if err1 != nil {
 			return err1
@@ -106,7 +113,7 @@ func (client *Client) Deploy() error {
 		}
 		err1 = environment.Build(map[string]interface{}{
 			"Region":             client.provider.Region(),
-			"Zone":               client.provider.Zone(),
+			"Zone":               client.provider.Zone(""),
 			"Tags":               "",
 			"Project":            project,
 			"GCPCredentialsJSON": credentialspath,
@@ -116,12 +123,11 @@ func (client *Client) Deploy() error {
 			"DBTier":             "db-f1-micro",
 			"DBPassword":         c.RDSPassword,
 			"DBUsername":         c.RDSUsername,
+			"DBName":             c.RDSDefaultDatabaseName,
 		})
 		if err1 != nil {
 			return err1
 		}
-		// @Note fix this
-		c.RDSDefaultDatabaseName, _ = metadata.Get("DBName")
 	default:
 		return errors.New("concourse:deploy:unsupported iaas " + client.deployArgs.IAAS)
 	}
@@ -649,4 +655,14 @@ func loadDirectorCreds(configClient config.IClient) ([]byte, error) {
 	}
 
 	return configClient.LoadAsset(bosh.CredsFilename)
+}
+
+func eightRandomLetters() string {
+	rand.Seed(time.Now().UTC().UnixNano())
+	letterBytes := "abcdefghijklmnopqrstuvwxyz"
+	b := make([]byte, 8)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }

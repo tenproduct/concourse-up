@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/EngineerBetter/concourse-up/util"
@@ -63,6 +62,7 @@ type Config struct {
 	Tags                      []string `json:"tags"`
 	TFStatePath               string   `json:"tf_state_path"`
 	Version                   string   `json:"version"`
+	WorkerType                string   `json:"worker_type"`
 }
 
 func generateDefaultConfig(project, deployment, configBucket, region, namespace string) (Config, error) {
@@ -72,7 +72,7 @@ func generateDefaultConfig(project, deployment, configBucket, region, namespace 
 	}
 
 	conf := Config{
-		AvailabilityZone:         fmt.Sprintf("%sa", region),
+		AvailabilityZone:         "",
 		ConcourseDBName:          "concourse_atc",
 		ConcourseWorkerCount:     1,
 		ConcourseWebSize:         "small",
@@ -90,7 +90,6 @@ func generateDefaultConfig(project, deployment, configBucket, region, namespace 
 		PrivateKey:               strings.TrimSpace(string(privateKey)),
 		Project:                  project,
 		PublicKey:                strings.TrimSpace(string(publicKey)),
-		RDSDefaultDatabaseName:   "bosh",
 		RDSPassword:              util.GeneratePassword(),
 		RDSUsername:              "admin" + util.GeneratePassword(),
 		Region:                   region,
