@@ -2,7 +2,7 @@
 
 set -eu
 
-version=dev
+version=$1
 grep -lr --include=*.go --exclude-dir=vendor "go:generate go-bindata" . | xargs -I {} go generate {}
 GO111MODULE=on go build -mod=vendor -ldflags "
   -X github.com/EngineerBetter/concourse-up/fly.ConcourseUpVersion=$version

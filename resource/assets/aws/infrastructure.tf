@@ -585,7 +585,7 @@ resource "aws_db_subnet_group" "default" {
 }
 
 resource "aws_db_instance" "default" {
-  allocated_storage      = 10
+  allocated_storage      = 200
   apply_immediately      = true
   port                   = 5432
   engine                 = "postgres"
